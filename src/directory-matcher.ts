@@ -98,7 +98,7 @@ function renderDirectoryList(mypath: string, res: Response): rxme.Subject {
 export default function directoryMatcher(rapp: rxme.Subject, s3: AWS.S3, config: any): rxme.MatcherCallback {
   return RxExpressMatcher((remw, sub) => {
     const { req, res } = remw;
-    let mypath = req.path;
+    let mypath = req.path.replace(/\/+/, '/');
     if (req.path.startsWith(config.basepath)) {
       mypath = req.path.substr(config.basepath.length);
     }
@@ -120,8 +120,10 @@ export default function directoryMatcher(rapp: rxme.Subject, s3: AWS.S3, config:
 
     const listObjects = new rxme.Subject().match(rx => {
       // console.log(`listObject:Match:`, config.s3.Bucket, rx.data);
-      if (rx.data.Name == config.s3.Bucket) {
+      // rapp.next(rxme.LogDebug(`listObject:Match:`, config.s3.Bucket, rx.data));
+      if (rx.data.Contents && rx.data.CommonPrefixes) {
         const sloo = rx.data as AWS.S3.Types.ListObjectsOutput;
+        // console.log(`CommonPrefix:${JSON.stringify(sloo.CommonPrefixes)}`);
         (sloo.CommonPrefixes || []).forEach(cp => renderList.next(new rxme.RxMe(cp)));
         (sloo.Contents || []).forEach(cs => renderList.next(new rxme.RxMe(cs)));
         if (!sloo.IsTruncated) {

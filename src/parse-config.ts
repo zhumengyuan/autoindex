@@ -1,7 +1,7 @@
 import * as yargs from 'yargs';
 import * as AWS from 'aws-sdk';
 import * as fs from 'fs';
-import { Bucket } from 'aws-sdk/clients/s3';
+// import { Bucket } from 'aws-sdk/clients/s3';
 import * as https from 'https';
 // import { ServerOptions } from 'http2';
 
@@ -28,6 +28,7 @@ export interface Config {
   https?: https.ServerOptions;
   s3: S3;
   aws: AWSConfig;
+  aws_module: string;
 }
 
 export default function parseConfig(argv: string[]): Config {
@@ -45,6 +46,9 @@ export default function parseConfig(argv: string[]): Config {
   }).option('s3-Bucket', {
     describe: 's3 bucket name',
     require: true
+  }).option('aws-module', {
+    describe: 'aws module could load the mock',
+    default: 'aws'
   }).option('aws-accessKeyId', {
     describe: 'aws accessKeyId'
   }).option('aws-secretAccessKey', {
@@ -76,6 +80,7 @@ export default function parseConfig(argv: string[]): Config {
     basepath: y.argv.basepath,
     port: y.argv.port,
     s3: { Bucket: y.argv.s3Bucket },
+    aws_module: y.argv.awsModule,
     aws: {
       accessKeyId: cred.accessKeyId,
       secretAccessKey: cred.secretAccessKey,
