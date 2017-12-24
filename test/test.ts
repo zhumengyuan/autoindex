@@ -3,7 +3,7 @@ import { assert } from 'chai';
 import server from '../src/server';
 
 import * as AWSMock from 'mock-aws-s3';
-import * as uuid from 'node-uuid';
+import * as uuid from 'uuid';
 import * as request from 'request-promise-native';
 import * as htmlparser from 'htmlparser2';
 import * as rxme from 'rxme';
