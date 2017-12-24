@@ -1,3 +1,7 @@
+[![Build Status](https://travis-ci.org/mabels/s3-autoindex.svg?branch=master)](https://travis-ci.org/mabels/s3-autoindex)
+[![npm](https://img.shields.io/npm/v/s3-autoindex.svg)](https://www.npmjs.com/package/s3-autoindex)
+[![Greenkeeper badge](https://badges.greenkeeper.io/mabels/s3-autoindex.svg)](https://greenkeeper.io/)
+
 # s3-autoindex
 
 Serve the contents of a S3 bucket (private or public) over HTTP.
