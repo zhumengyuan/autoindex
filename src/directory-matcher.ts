@@ -1,7 +1,7 @@
 import * as rxme from 'rxme';
 import { RxHttpMatcher } from './rx-http';
 // import { Response, Request } from 'express-serve-static-core';
-import { Response, Request } from './rx-http';
+import { Response } from './rx-http';
 import * as AWS from 'aws-sdk';
 
 function loopListObjects(s3: AWS.S3, config: any, mypath: string, listObjects: rxme.Subject, marker?: string): void {

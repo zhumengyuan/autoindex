@@ -1,6 +1,6 @@
 import * as rxme from 'rxme';
 import { RxHttpMatcher } from './rx-http';
-import { Response, Request } from './rx-http';
+import { Response } from './rx-http';
 
 function loopGetObject(rapp: rxme.Subject,  s3: AWS.S3, config: any, mypath: string, res: Response, ofs = 0): void {
   const bufSize = 1024 * 1024;
