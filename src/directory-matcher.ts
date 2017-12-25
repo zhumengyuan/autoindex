@@ -1,6 +1,7 @@
 import * as rxme from 'rxme';
-import { RxExpressMatcher } from './rx-express';
-import { Response, Request } from 'express-serve-static-core';
+import { RxHttpMatcher } from './rx-http';
+// import { Response, Request } from 'express-serve-static-core';
+import { Response, Request } from './rx-http';
 import * as AWS from 'aws-sdk';
 
 function loopListObjects(s3: AWS.S3, config: any, mypath: string, listObjects: rxme.Subject, marker?: string): void {
@@ -96,11 +97,11 @@ function renderDirectoryList(mypath: string, res: Response): rxme.Subject {
 }
 
 export default function directoryMatcher(rapp: rxme.Subject, s3: AWS.S3, config: any): rxme.MatcherCallback {
-  return RxExpressMatcher((remw, sub) => {
+  return RxHttpMatcher((remw, sub) => {
     const { req, res } = remw;
-    let mypath = req.path.replace(/\/+/, '/');
-    if (req.path.startsWith(config.basepath)) {
-      mypath = req.path.substr(config.basepath.length);
+    let mypath = req.url.replace(/\/+/, '/');
+    if (mypath.startsWith(config.basepath)) {
+      mypath = mypath.substr(config.basepath.length);
     }
     // rapp.next(rxme.LogInfo(`[${req.path}] [${mypath}]`));
     if (!mypath.endsWith('/')) {

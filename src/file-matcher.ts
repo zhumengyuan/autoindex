@@ -1,6 +1,6 @@
 import * as rxme from 'rxme';
-import { RxExpressMatcher } from './rx-express';
-import { Response } from 'express-serve-static-core';
+import { RxHttpMatcher } from './rx-http';
+import { Response, Request } from './rx-http';
 
 function loopGetObject(rapp: rxme.Subject,  s3: AWS.S3, config: any, mypath: string, res: Response, ofs = 0): void {
   const bufSize = 1024 * 1024;
@@ -11,16 +11,19 @@ function loopGetObject(rapp: rxme.Subject,  s3: AWS.S3, config: any, mypath: str
   rapp.next(rxme.LogDebug(`s3.getObject:Request:`, lof));
   s3.getObject(lof, (err, data) => {
     if (err) {
-      res.status(err.statusCode);
+      res.statusCode = err.statusCode;
       res.end();
       return;
     } else {
-      res.status(200);
+      res.statusCode = 200;
     }
     rapp.next(rxme.LogDebug(`s3.getObject:Request:data:`, data));
     if (ofs == 0) {
       // bytes 229638144-230686719/584544256
-      const len = data.ContentRange.split('/').slice(-1)[0] || ('' + data.ContentLength);
+      let len = ('' + data.ContentLength);
+      if (data.ContentRange) {
+        len = data.ContentRange.split('/').slice(-1)[0];
+      }
       const headers: { [s: string]: string; } = {
         'Content-Length': len,
         'Last-Modified': data.LastModified.toUTCString(),
@@ -35,7 +38,7 @@ function loopGetObject(rapp: rxme.Subject,  s3: AWS.S3, config: any, mypath: str
       };
       for (let k in headers) {
         if (headers[k]) {
-          res.set(k, headers[k]);
+          res.setHeader(k, headers[k]);
         }
       }
     }
@@ -49,8 +52,11 @@ function loopGetObject(rapp: rxme.Subject,  s3: AWS.S3, config: any, mypath: str
 }
 
 export default function fileMatcher(rapp: rxme.Subject, s3: AWS.S3, config: any): rxme.MatcherCallback {
-  return RxExpressMatcher((remw, sub) => {
-    let mypath = remw.req.path;
+  return RxHttpMatcher((remw, sub) => {
+    let mypath = remw.req.url.replace(/\/+/, '/');
+    if (mypath.startsWith(config.basepath)) {
+      mypath = mypath.substr(config.basepath.length);
+    }
     if (mypath.endsWith('/')) {
       // is a not a file
       return;

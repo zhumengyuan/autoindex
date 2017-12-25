@@ -35,31 +35,33 @@ export default function parseConfig(argv: string[]): Config {
   const y = yargs.usage('$0 <cmd> [args]');
   y.option('basepath', {
     describe: 'basepath currently unused',
-    default: ''
+    default: process.env.BASEPATH || ''
   }).option('port', {
     describe: 'port',
-    default: 9000
+    default: parseInt(process.env.PORT, 10) || 9000,
   }).option('https-privateKey', {
     describe: 'pemfile of private key',
   }).option('https-certificate', {
     describe: 'pemfile of certificate'
   }).option('s3-Bucket', {
     describe: 's3 bucket name',
-    require: true
+    default: process.env.S3_BUCKET,
+    require: !process.env.S3_BUCKET
   }).option('aws-module', {
     describe: 'aws module could load the mock',
     default: 'aws'
   }).option('aws-accessKeyId', {
-    describe: 'aws accessKeyId'
+    describe: 'aws accessKeyId',
+    default: process.env.AWS_ACCESS_KEY_ID
   }).option('aws-secretAccessKey', {
-    describe: 'aws secretAccessKey'
-  }).option('aws-endpoint', {
-    describe: 'endpoint url'
+    describe: 'aws secretAccessKey',
+    default: process.env.AWS_SECRET_ACCESS_KEY
   }).option('aws-profile', {
     describe: 'load credential profile ',
     default: 'default'
   }).option('aws-endpoint', {
-    describe: 'endpoint url'
+    describe: 'endpoint url',
+    default: process.env.AWS_ENDPOINT
   }).option('aws-sslEnabled', {
     describe: 'enable ssl communication',
     default: true
@@ -73,8 +75,8 @@ export default function parseConfig(argv: string[]): Config {
   };
   if (y.argv.awsProfile) {
     const credential = new AWS.SharedIniFileCredentials({ profile: y.argv.awsProfile });
-    cred.accessKeyId = credential.accessKeyId;
-    cred.secretAccessKey = credential.secretAccessKey;
+    cred.accessKeyId = cred.accessKeyId || credential.accessKeyId;
+    cred.secretAccessKey = cred.secretAccessKey || credential.secretAccessKey;
   }
   const config: Config = {
     basepath: y.argv.basepath,

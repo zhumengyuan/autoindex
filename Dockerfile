@@ -1,8 +1,8 @@
 FROM node:boron-alpine
 
-COPY lib /my_app/lib/
-COPY bin /my_app/bin/
-COPY package.json /my_app/
-RUN (cd /my_app && npm install)
+COPY src /my_app/src/
+COPY test /my_app/test/
+COPY Dockerfile LICENSE README.md tsconfig.json tslint.json package.json /my_app/
+RUN (cd /my_app && npm install && npm test)
 
-CMD ["/bin/sh", "-c", "(cd /my_app && /usr/local/bin/node bin/server.js)"]
+CMD ["/bin/sh", "-c", "(cd /my_app && /usr/local/bin/node dist/src/main.js)"]
