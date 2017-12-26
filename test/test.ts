@@ -79,7 +79,7 @@ const actions = [
       if (fname.startsWith('/basepath')) {
         next = -1;
       }
-      requestServer(srv, next, '/basepath/');
+      requestServer(srv, next, '/basepath//');
     })).passTo();
   }
 ];

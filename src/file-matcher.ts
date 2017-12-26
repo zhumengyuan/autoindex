@@ -53,7 +53,8 @@ function loopGetObject(rapp: rxme.Subject,  s3: AWS.S3, config: any, mypath: str
 
 export default function fileMatcher(rapp: rxme.Subject, s3: AWS.S3, config: any): rxme.MatcherCallback {
   return RxHttpMatcher((remw, sub) => {
-    let mypath = remw.req.url.replace(/\/+/, '/');
+    let mypath = remw.req.url.replace(/\/+/g, '/');
+    // console.log(`fileMatcher:${mypath}:${remw.req.url}`);
     if (mypath.startsWith(config.basepath)) {
       mypath = mypath.substr(config.basepath.length);
     }

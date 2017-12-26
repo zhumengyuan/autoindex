@@ -99,7 +99,8 @@ function renderDirectoryList(mypath: string, res: Response): rxme.Subject {
 export default function directoryMatcher(rapp: rxme.Subject, s3: AWS.S3, config: any): rxme.MatcherCallback {
   return RxHttpMatcher((remw, sub) => {
     const { req, res } = remw;
-    let mypath = req.url.replace(/\/+/, '/');
+    let mypath = req.url.replace(/\/+/g, '/');
+    // console.log(`directoryMatcher:${mypath}:${req.url}`);
     if (mypath.startsWith(config.basepath)) {
       mypath = mypath.substr(config.basepath.length);
     }
