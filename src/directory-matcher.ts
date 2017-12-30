@@ -3,27 +3,35 @@ import { RxHttpMatcher } from './rx-http';
 // import { Response, Request } from 'express-serve-static-core';
 import { Response } from './rx-http';
 import * as AWS from 'aws-sdk';
+import * as simqle from 'simqle';
 
-function loopListObjects(s3: AWS.S3, config: any, mypath: string, listObjects: rxme.Subject, marker?: string): void {
-  const lo = Object.assign({
-    // EncodingType: 'url',
-    Delimiter: '/',
-    Prefix: mypath,
-    Marker: marker
-  }, config.s3);
-  listObjects.next(rxme.LogDebug(`s3.listObjects:Request:`, lo));
-  s3.listObjects(lo, (error, data) => {
-    if (error) {
-      listObjects.next(rxme.LogError('AWS:', error));
-      return;
-    }
-    listObjects.next(new rxme.RxMe(data));
-    if (!data.IsTruncated) {
-      listObjects.next(rxme.LogDebug(`s3.listObjects:Completed`));
-      listObjects.complete();
-    } else {
-      loopListObjects(s3, config, mypath, listObjects, data.Contents[data.Contents.length - 1].Key);
-    }
+function loopListObjects(rq: simqle.Queue, s3: AWS.S3, config: any, mypath: string,
+  listObjects: rxme.Subject, marker?: string): rxme.Observable {
+  return rxme.Observable.create(obs => {
+    const lo = {
+      // EncodingType: 'url',
+      Bucket: config.s3.Bucket,
+      Delimiter: '/',
+      Prefix: mypath,
+      Marker: marker
+    };
+    listObjects.next(rxme.LogDebug(`s3.listObjects:Request:`, lo));
+    s3.listObjects(lo, (error, data) => {
+      if (error) {
+        listObjects.next(rxme.LogError('AWS:', error));
+        return;
+      }
+      listObjects.next(new rxme.RxMe(data));
+      if (!data.IsTruncated) {
+        listObjects.next(rxme.LogDebug(`s3.listObjects:Completed`));
+        listObjects.complete();
+        obs.complete();
+      } else {
+        obs.complete();
+        rq.push(loopListObjects(rq, s3, config, mypath, listObjects, data.Contents[data.Contents.length - 1].Key),
+          (new rxme.Subject()).passTo());
+      }
+    });
   });
 }
 
@@ -69,7 +77,7 @@ function leftPad(istr: any, len: number, ch: string): string {
 
 function formatDate(a: Date): string {
   return [
-    `${leftPad(a.getDate(), 2, '0')}-${leftPad(a.getMonth(), 2, '0')}-${a.getFullYear()}`,
+    `${leftPad(a.getDate(), 2, '0')}-${leftPad(a.getMonth() + 1, 2, '0')}-${a.getFullYear()}`,
     `${leftPad(a.getHours(), 2, '0')}:${leftPad(a.getMinutes(), 2, '0')}`].join(' ');
 }
 
@@ -78,7 +86,29 @@ function link(fname: string): string {
   return `<a href="${spcs.key}">${spcs.keyDotDot}</a>${spcs.spaces}`;
 }
 
-function renderDirectoryList(mypath: string, res: Response): rxme.Subject {
+function resolvHeadObject(mypath: string, so: AWS.S3.Object, res: Response,
+  rapp: rxme.Subject, s3: AWS.S3, config: any): void {
+  if (!config.s3.UseMetaMtime) {
+    res.write(`${link(so.Key.slice(mypath.length))} ${formatDate(so.LastModified)} ${leftPad(so.Size, 16, ' ')}\n`);
+    return;
+  }
+  const params = {
+    Bucket: config.s3.Bucket,
+    Key: so.Key
+  };
+  s3.headObject(params, (err, headObject) => {
+    if (err) {
+      rapp.next(rxme.Msg.Error(err));
+      return;
+    }
+    console.log(headObject);
+    res.write([`${link(so.Key.slice(mypath.length))}`,
+    `${formatDate(new Date(headObject.Metadata.Mtime))}`,
+    `${leftPad(so.Size, 16, ' ')}\n`].join(' '));
+  });
+}
+
+function renderDirectoryList(mypath: string, res: Response, rapp: rxme.Subject, s3: AWS.S3, config: any): rxme.Subject {
   const now = formatDate(new Date());
   return new rxme.Subject().match(rx => {
     // directory S3.CommonPrefixe
@@ -89,14 +119,15 @@ function renderDirectoryList(mypath: string, res: Response): rxme.Subject {
     // file S3.Object
     if (!rx.data.Key) { return; }
     const so = rx.data as AWS.S3.Object;
-    res.write(`${link(so.Key.slice(mypath.length))} ${formatDate(so.LastModified)} ${leftPad(so.Size, 16, ' ')}\n`);
+    resolvHeadObject(mypath, so, res, rapp, s3, config);
   }).match(rxme.Matcher.Complete(() => {
     res.write(footer());
     res.end();
   })).passTo();
 }
 
-export default function directoryMatcher(rapp: rxme.Subject, s3: AWS.S3, config: any): rxme.MatcherCallback {
+export default function directoryMatcher(rq: simqle.Queue, rapp: rxme.Subject,
+  s3: AWS.S3, config: any): rxme.MatcherCallback {
   return RxHttpMatcher((remw, sub) => {
     const { req, res } = remw;
     let mypath = req.url.replace(/\/+/g, '/');
@@ -112,7 +143,7 @@ export default function directoryMatcher(rapp: rxme.Subject, s3: AWS.S3, config:
     if (mypath.startsWith('/')) {
       mypath = mypath.substr(1);
     }
-    const renderList = renderDirectoryList(mypath, res);
+    const renderList = renderDirectoryList(mypath, res, rapp, s3, config);
 
     res.write(top(config, mypath));
     if (mypath.length > 1) {
@@ -132,7 +163,7 @@ export default function directoryMatcher(rapp: rxme.Subject, s3: AWS.S3, config:
           renderList.complete();
         }
       }
-    }).passTo(rapp);
-    loopListObjects(s3, config, mypath, listObjects);
+    }).match(rxme.Matcher.Complete(() => true)).passTo(rapp);
+    rq.push(loopListObjects(rq, s3, config, mypath, listObjects), (new rxme.Subject()).passTo());
   });
 }

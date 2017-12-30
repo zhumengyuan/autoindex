@@ -12,6 +12,8 @@ import * as https from 'https';
 
 export interface S3 {
   Bucket: string;
+  UseMetaMtime: boolean;
+  Concurrent: number;
 }
 
 export interface AWSConfig {
@@ -47,6 +49,12 @@ export default function parseConfig(argv: string[]): Config {
     describe: 's3 bucket name',
     default: process.env.S3_BUCKET,
     require: !process.env.S3_BUCKET
+  }).option('s3-use-meta-mtime', {
+    describe: 'use headobject call to get mtime(rclone)',
+    default: false
+  }).option('s3-concurrent', {
+    describe: 'nr of concurrent requests',
+    default: 8
   }).option('aws-module', {
     describe: 'aws module could load the mock',
     default: 'aws'
@@ -81,7 +89,11 @@ export default function parseConfig(argv: string[]): Config {
   const config: Config = {
     basepath: y.argv.basepath,
     port: y.argv.port,
-    s3: { Bucket: y.argv.s3Bucket },
+    s3: {
+      Bucket: y.argv.s3Bucket,
+      UseMetaMtime: y.argv.s3UseMetaMtime,
+      Concurrent: y.argv.s3Concurrent
+    },
     aws_module: y.argv.awsModule,
     aws: {
       accessKeyId: cred.accessKeyId,

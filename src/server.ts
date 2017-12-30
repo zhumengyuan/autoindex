@@ -13,6 +13,8 @@ import * as rxme from 'rxme';
 // import { RxExpress } from './rx-express';
 // import * as leftPad from 'left-pad';
 // import { Request } from 'aws-sdk/lib/request';
+import * as simqle from 'simqle';
+import QWorker from './q-worker';
 
 import { RxHttp } from './rx-http';
 
@@ -24,13 +26,13 @@ import * as AWSMock from 'mock-aws-s3';
 
 export function RxHttpMatcher(cb:
   (t: http.Server | https.Server | net.Server, sub?: rxme.Subject) => rxme.MatchReturn): rxme.MatcherCallback {
-    return (rx, sub): rxme.MatchReturn => {
-      if (rx.data instanceof net.Server ||
-          rx.data instanceof http.Server ||
-          rx.data instanceof https.Server) {
-        return cb(rx.data, sub);
-      }
-    };
+  return (rx, sub): rxme.MatchReturn => {
+    if (rx.data instanceof net.Server ||
+      rx.data instanceof http.Server ||
+      rx.data instanceof https.Server) {
+      return cb(rx.data, sub);
+    }
+  };
 }
 
 interface HttpHandler {
@@ -48,34 +50,40 @@ export function server(argv: string[]): rxme.Observable {
     const config = parseConfig(argv);
     // console.log(`Start:`, config);
 
-    let s3;
+    let s3: any;
     if (config.aws_module == 'aws') {
-      rxo.next(rxme.Msg.LogInfo(`booting AWSReal:`, config));
+      rxo.next(rxme.Msg.LogInfo(`booting AWSReal:`, JSON.stringify(config)));
       s3 = new AWSReal.S3(config.aws);
     } else {
-      rxo.next(rxme.Msg.LogInfo(`booting AWSMock:`, config));
+      rxo.next(rxme.Msg.LogInfo(`booting AWSMock:`, JSON.stringify(config)));
       s3 = new AWSMock.S3(config.aws);
     }
     // const app = express();
 
     const rapp = new rxme.Subject();
-    rapp
-      .match(directoryMatcher(rapp, s3, config))
-      .match(fileMatcher(rapp, s3, config))
-      .passTo(rxo);
+    simqle.start({ taskTimer: 60000 }).match(simqle.MatchQ(rq => {
+      Array(config.s3.Concurrent).fill(0).forEach(a => {
+        rq.addWorker(QWorker);
+      });
+      rxo.next(rxme.Msg.LogInfo(`Started Q with ${config.s3.Concurrent} workers.`));
+      rapp
+        .match(directoryMatcher(rq, rapp, s3, config))
+        .match(fileMatcher(rq, rapp, s3, config))
+        .passTo(rxo);
 
-    // app.use('/', (req, res, next) => { rapp.next(RxExpress(req, res, next)); });
-    if (config.https) {
-      const httpServer = https.createServer(config.https, RxMsgHttp(rapp));
-      rxo.next(rxme.Msg.LogInfo(`Listen on: https ${config.port}`));
-      httpServer.listen(config.port);
-      rxo.next(rxme.Msg.Type(httpServer));
-    } else {
-      const httpServer = http.createServer(RxMsgHttp(rapp));
-      rxo.next(rxme.Msg.LogInfo(`Listen on: http ${config.port}`));
-      httpServer.listen(config.port);
-      rxo.next(rxme.Msg.Type(httpServer));
-    }
+      // app.use('/', (req, res, next) => { rapp.next(RxExpress(req, res, next)); });
+      if (config.https) {
+        const httpServer = https.createServer(config.https, RxMsgHttp(rapp));
+        rxo.next(rxme.Msg.LogInfo(`Listen on: https ${config.port}`));
+        httpServer.listen(config.port);
+        rxo.next(rxme.Msg.Type(httpServer));
+      } else {
+        const httpServer = http.createServer(RxMsgHttp(rapp));
+        rxo.next(rxme.Msg.LogInfo(`Listen on: http ${config.port}`));
+        httpServer.listen(config.port);
+        rxo.next(rxme.Msg.Type(httpServer));
+      }
+    })).passTo(rapp);
   });
 }
 
