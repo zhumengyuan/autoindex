@@ -7,12 +7,8 @@ import * as uuid from 'uuid';
 import * as request from 'request-promise-native';
 import * as htmlparser from 'htmlparser2';
 import * as rxme from 'rxme';
-import * as https from 'https';
-import * as http from 'http';
-import * as net from 'net';
 import * as memwatch from 'memwatch-next';
 import { setTimeout } from 'timers';
-
 
 const DomHandler = require('domhandler');
 const DomUtils = require('domutils');
@@ -36,7 +32,6 @@ function htmlToDom(htmlfrag: string): rxme.Observable {
   });
 }
 
-declare type Server = https.Server | http.Server | net.Server;
 // a FSM is simple but who can understand this -;)
 const actions = [
   (idx: number, html: rxme.Observable, fname: string, cb: () => void) => {
