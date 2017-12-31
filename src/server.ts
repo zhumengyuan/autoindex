@@ -24,8 +24,10 @@ import parseConfig from './parse-config';
 import * as AWSReal from 'aws-sdk';
 import * as AWSMock from 'mock-aws-s3';
 
+export type Server = http.Server | https.Server | net.Server;
+
 export function RxHttpMatcher(cb:
-  (t: http.Server | https.Server | net.Server, sub?: rxme.Subject) => rxme.MatchReturn): rxme.MatcherCallback {
+  (t: Server, sub?: rxme.Subject) => rxme.MatchReturn): rxme.MatcherCallback {
   return (rx, sub): rxme.MatchReturn => {
     if (rx.data instanceof net.Server ||
       rx.data instanceof http.Server ||
@@ -46,10 +48,10 @@ function RxMsgHttp(rapp: rxme.Subject): HttpHandler {
 }
 
 export function server(argv: string[]): rxme.Observable {
+  let runningServer: Server;
+  let runningQueue: simqle.Queue;
   return rxme.Observable.create(rxo => {
     const config = parseConfig(argv);
-    // console.log(`Start:`, config);
-
     let s3: any;
     if (config.aws_module == 'aws') {
       rxo.next(rxme.Msg.LogInfo(`booting AWSReal:`, JSON.stringify(config)));
@@ -58,10 +60,10 @@ export function server(argv: string[]): rxme.Observable {
       rxo.next(rxme.Msg.LogInfo(`booting AWSMock:`, JSON.stringify(config)));
       s3 = new AWSMock.S3(config.aws);
     }
-    // const app = express();
-
+    rxo.next(rxme.Msg.Observer(rxo));
     const rapp = new rxme.Subject();
     simqle.start({ taskTimer: 60000 }).match(simqle.MatchQ(rq => {
+      runningQueue = rq;
       Array(config.s3.Concurrent).fill(0).forEach(a => {
         rq.addWorker(QWorker);
       });
@@ -77,14 +79,20 @@ export function server(argv: string[]): rxme.Observable {
         rxo.next(rxme.Msg.LogInfo(`Listen on: https ${config.port}`));
         httpServer.listen(config.port);
         rxo.next(rxme.Msg.Type(httpServer));
+        runningServer = httpServer;
       } else {
         const httpServer = http.createServer(RxMsgHttp(rapp));
         rxo.next(rxme.Msg.LogInfo(`Listen on: http ${config.port}`));
         httpServer.listen(config.port);
         rxo.next(rxme.Msg.Type(httpServer));
+        runningServer = httpServer;
       }
     })).passTo(rapp);
-  });
+  }).match(rxme.Matcher.Complete(() => {
+    console.log(`got complete`);
+    runningQueue.stop().passTo();
+    runningServer.close();
+  }));
 }
 
 export default server;

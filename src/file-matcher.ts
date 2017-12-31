@@ -1,10 +1,11 @@
 import * as rxme from 'rxme';
 import { RxHttpMatcher } from './rx-http';
 import { Response } from './rx-http';
+import { Config } from './parse-config';
 import * as simqle from 'simqle';
 import { Subject } from 'rxme';
 
-function loopGetObject(rq: simqle.Queue, rapp: rxme.Subject, s3: AWS.S3, config: any,
+function loopGetObject(rq: simqle.Queue, rapp: rxme.Subject, s3: AWS.S3, config: Config,
   mypath: string, res: Response, ofs = 0): rxme.Observable {
   return rxme.Observable.create(obs => {
     const bufSize = 1024 * 1024;
@@ -17,6 +18,7 @@ function loopGetObject(rq: simqle.Queue, rapp: rxme.Subject, s3: AWS.S3, config:
     s3.getObject(lof, (err, data) => {
       if (err) {
         res.statusCode = err.statusCode;
+        res.setHeader('X-s3-autoindex', config.version);
         res.end();
         obs.complete();
         return;
@@ -32,6 +34,7 @@ function loopGetObject(rq: simqle.Queue, rapp: rxme.Subject, s3: AWS.S3, config:
         }
         rapp.next(rxme.LogInfo(`fileMatcher:${mypath}:${len}`));
         const headers: { [s: string]: string; } = {
+          'X-s3-autoindex': config.version,
           'Content-Length': len,
           'Last-Modified': data.LastModified.toUTCString(),
           'Expiration': data.Expiration,

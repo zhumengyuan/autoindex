@@ -1,6 +1,6 @@
 {
   "name": "s3-autoindex",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Serve the contents of a S3 bucket (private or public) over HTTP",
   "keywords": [
     "aws",
@@ -17,7 +17,7 @@
     "prebuild": "npm run clean",
     "build": "tsc",
     "lint": "tslint --project tsconfig.json",
-    "test": "node dist/test/test.js",
+    "test": "node --expose-gc dist/test/test.js",
     "pretest": "npm run build",
     "prepare": "npm run lint && npm run clean && npm run build && npm test"
   },
@@ -34,12 +34,14 @@
     "@types/chai": "^4.0.10",
     "@types/htmlparser2": "^3.7.31",
     "@types/mock-aws-s3": "^2.6.0",
+    "@types/memwatch-next": "^0.3.1",
     "@types/node": "^8.5.2",
     "@types/request-promise-native": "^1.0.10",
     "@types/uuid": "^3.4.3",
     "@types/yargs": "^10.0.0",
     "chai": "^4.1.2",
     "domhandler": "^2.4.1",
+    "memwatch-next": "^0.3.0",
     "domutils": "^1.6.2",
     "htmlparser2": "^3.9.2",
     "request": "^2.83.0",
@@ -51,7 +53,7 @@
   "dependencies": {
     "aws-sdk": "^2.176.0",
     "mock-aws-s3": "^2.6.0",
-    "rxme": "^1.4.1",
+    "rxme": "^1.4.2",
     "simqle": "^4.0.1",
     "uuid": "^3.1.0",
     "yargs": "^10.0.3"

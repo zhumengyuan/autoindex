@@ -10,6 +10,9 @@ import * as rxme from 'rxme';
 import * as https from 'https';
 import * as http from 'http';
 import * as net from 'net';
+import * as memwatch from 'memwatch-next';
+import { setTimeout } from 'timers';
+
 
 const DomHandler = require('domhandler');
 const DomUtils = require('domutils');
@@ -36,7 +39,7 @@ function htmlToDom(htmlfrag: string): rxme.Observable {
 declare type Server = https.Server | http.Server | net.Server;
 // a FSM is simple but who can understand this -;)
 const actions = [
-  (srv: Server, idx: number, html: rxme.Observable, fname: string) => {
+  (idx: number, html: rxme.Observable, fname: string, cb: () => void) => {
     // console.log(html);
     html.match(rx => {
       if (!Array.isArray(rx.data)) { return; }
@@ -47,11 +50,11 @@ const actions = [
     }).match(rxme.Matcher.Complete(() => {
       s3.putObject({ Body: '<hw>hello world</hw>', Bucket: testId, Key: 'hello-world' }, (err, data) => {
         // console.log(err, data);
-        requestServer(srv, idx + 1, fname);
+        requestServer(idx + 1, fname, cb);
       });
     })).passTo();
   },
-  (srv: Server, idx: number, html: rxme.Observable, fname: string) => {
+  (idx: number, html: rxme.Observable, fname: string, cb: () => void) => {
     html.match(rx => {
       if (!Array.isArray(rx.data)) { return; }
       // console.log(rx.data);
@@ -62,10 +65,10 @@ const actions = [
       assert.equal('hello-world', pre[1].attribs.href);
       assert.equal('hello-world', pre[1].children[0].data);
     }).match(rxme.Matcher.Complete(() => {
-      requestServer(srv, idx + 1, `${fname}/hello-world`);
+      requestServer(idx + 1, `${fname}/hello-world`, cb);
     })).passTo();
   },
-  (srv: Server, idx: number, html: rxme.Observable, fname: string) => {
+  (idx: number, html: rxme.Observable, fname: string, cb: () => void) => {
     html.match(rx => {
       if (!Array.isArray(rx.data)) { return; }
       // console.log(rx.data);
@@ -79,27 +82,38 @@ const actions = [
       if (fname.startsWith('/basepath')) {
         next = -1;
       }
-      requestServer(srv, next, '/basepath//');
+      requestServer(next, '/basepath//', cb);
     })).passTo();
   }
 ];
 
-function requestServer(srv: Server, idx: number, fname = ''): void {
+function requestServer(idx: number, fname: string, cb: () => void): void {
   if (idx < 0) {
-    srv.close();
+    // srv.close();
+    cb();
     return;
   }
   const url = `http://localhost:${testPort}/${fname}`;
-  console.log(`requestServer:${url}:${idx}`);
+  // console.log(`requestServer:${url}:${idx}`);
   request(url).then(html => {
     // console.log(`requestServer:${html}`);
-    actions[idx % actions.length](srv, idx, htmlToDom(html), fname);
+    actions[idx % actions.length](idx, htmlToDom(html), fname, cb);
   });
 }
 
-s3.createBucket({ Bucket: testId }, (err, data) => {
-  console.log(`createBucket`, err);
+function forceGC(): void {
+   if (global.gc) {
+      global.gc();
+   } else {
+      console.warn('No GC hook! Start your program as `node --expose-gc file.js`.');
+   }
+}
 
+s3.createBucket({ Bucket: testId }, (err, data) => {
+  // console.log(`createBucket`, err);
+
+  let looping = 1000;
+  let obs: rxme.Observer;
   server([
     '--basepath', '/basepath',
     '--s3-Bucket', testId,
@@ -107,10 +121,30 @@ s3.createBucket({ Bucket: testId }, (err, data) => {
     '--aws-endpoint', 'https://mock.land',
     '--aws-module', 'mock'
   ]).match(rxme.Matcher.Log(log => {
-    if (log.level != rxme.LogLevel.DEBUG) {
-      console.log(log);
-    }
+    // if (log.level != rxme.LogLevel.DEBUG) {
+      // console.log(log);
+    // }
+  })).match(rxme.Matcher.Observer(rx => {
+    // console.log(rx);
+    obs = rx;
   })).match(RxHttpMatcher(srv => {
-    requestServer(srv, 0);
+    const hd = new memwatch.HeapDiff();
+    function loop(): void {
+      // console.log(looping);
+      if (--looping > 0) {
+       requestServer(0, '', loop);
+      } else {
+        obs.complete();
+        forceGC();
+        setTimeout(() => {
+          const diff: any = hd.end();
+          console.log(`Sending Complete:`, JSON.stringify({
+            before: diff.before,
+            after: diff.after
+          }, null, 2));
+        }, 50);
+      }
+    }
+    loop();
   })).passTo();
 });

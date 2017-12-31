@@ -1,6 +1,7 @@
 import * as yargs from 'yargs';
 import * as AWS from 'aws-sdk';
 import * as fs from 'fs';
+import * as path from 'path';
 // import { Bucket } from 'aws-sdk/clients/s3';
 import * as https from 'https';
 // import { ServerOptions } from 'http2';
@@ -25,6 +26,7 @@ export interface AWSConfig {
 }
 
 export interface Config {
+  version: string;
   basepath: string;
   port: number;
   https?: https.ServerOptions;
@@ -34,6 +36,16 @@ export interface Config {
 }
 
 export default function parseConfig(argv: string[]): Config {
+  const packageJsonFname = path.join(__dirname, '..', '..', 'package.json');
+  let version = 'unknown';
+  // console.log(`Version:`, packageJsonFname);
+  if (fs.existsSync(packageJsonFname)) {
+    try {
+      version = JSON.parse(fs.readFileSync(packageJsonFname).toString()).version;
+    } catch (e) {
+      // nothing
+    }
+  }
   const y = yargs.usage('$0 <cmd> [args]');
   y.option('basepath', {
     describe: 'basepath currently unused',
@@ -87,6 +99,7 @@ export default function parseConfig(argv: string[]): Config {
     cred.secretAccessKey = cred.secretAccessKey || credential.secretAccessKey;
   }
   const config: Config = {
+    version: version,
     basepath: y.argv.basepath,
     port: y.argv.port,
     s3: {
