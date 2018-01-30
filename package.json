@@ -1,6 +1,6 @@
 {
   "name": "s3-autoindex",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Serve the contents of a S3 bucket (private or public) over HTTP",
   "keywords": [
     "aws",

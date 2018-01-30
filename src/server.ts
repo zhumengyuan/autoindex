@@ -57,16 +57,14 @@ export function myPath(config: Config, url: string): MyPath {
       mypath = `/${mypath}`;
     }
   }
-  // console.log(`directoryMatcher:${mypath}:${url}`);
-  // rapp.next(rxme.LogInfo(`[${req.path}] [${mypath}]`));
-  if (!mypath.endsWith('/')) {
-    // not a directory
-    return new MyPath(mypath, FileType.FILE);
+  let fileType = FileType.FILE;
+  if (mypath.endsWith('/')) {
+    fileType = FileType.DIRECTORY;
   }
   if (mypath.startsWith('/')) {
     mypath = mypath.substr(1);
   }
-  return new MyPath(mypath, FileType.DIRECTORY);
+  return new MyPath(mypath, fileType);
 }
 
 export function RxHttpMatcher(cb:

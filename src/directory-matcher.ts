@@ -173,6 +173,14 @@ export default function directoryMatcher(rq: simqle.Queue, rapp: rxme.Subject,
       // not a directory
       return;
     }
+    if (!req.url.endsWith('/')) {
+      const url = `${req.url}/`;
+      res.statusCode = 302;
+      res.setHeader('Location', url);
+      res.write(`<a href="${url}">${url}</a>`);
+      res.end();
+      return;
+    }
     // const renderList = renderDirectoryList(mypath, res, rq, rapp, s3, config);
     res.statusCode = 200;
     res.setHeader('X-s3-autoindex', config.version);
