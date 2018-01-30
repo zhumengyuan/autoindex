@@ -35,7 +35,7 @@ export interface Config {
   aws_module: string;
 }
 
-export default function parseConfig(argv: string[]): Config {
+export function parseConfig(argv: string[]): Config {
   const packageJsonFname = path.join(__dirname, '..', '..', 'package.json');
   let version = 'unknown';
   // console.log(`Version:`, packageJsonFname);
@@ -126,3 +126,5 @@ export default function parseConfig(argv: string[]): Config {
   }
   return config;
 }
+
+export default parseConfig;

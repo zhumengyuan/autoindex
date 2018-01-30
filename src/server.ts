@@ -20,11 +20,54 @@ import { RxHttp } from './rx-http';
 
 import fileMatcher from './file-matcher';
 import directoryMatcher from './directory-matcher';
-import parseConfig from './parse-config';
+import { parseConfig, Config } from './parse-config';
 import * as AWSReal from 'aws-sdk';
 import * as AWSMock from 'mock-aws-s3';
 
 export type Server = http.Server | https.Server | net.Server;
+
+export enum FileType {
+  DIRECTORY = 'dir',
+  FILE = 'file'
+}
+
+export class MyPath {
+  public readonly name: string;
+  public readonly fileType: FileType;
+
+  constructor(name: string, fileType: FileType) {
+    this.name = name;
+    this.fileType = fileType;
+  }
+
+  public isDirectory(): boolean {
+    return this.fileType == FileType.DIRECTORY;
+  }
+  public isFile(): boolean {
+    return this.fileType == FileType.FILE;
+  }
+
+}
+
+export function myPath(config: Config, url: string): MyPath {
+  let mypath = url.replace(/\/+/g, '/');
+  if (config.basepath && mypath.startsWith(config.basepath)) {
+    mypath = mypath.substr(config.basepath.length);
+    if (!mypath.startsWith('/')) {
+      mypath = `/${mypath}`;
+    }
+  }
+  // console.log(`directoryMatcher:${mypath}:${url}`);
+  // rapp.next(rxme.LogInfo(`[${req.path}] [${mypath}]`));
+  if (!mypath.endsWith('/')) {
+    // not a directory
+    return new MyPath(mypath, FileType.FILE);
+  }
+  if (mypath.startsWith('/')) {
+    mypath = mypath.substr(1);
+  }
+  return new MyPath(mypath, FileType.DIRECTORY);
+}
 
 export function RxHttpMatcher(cb:
   (t: Server, sub?: rxme.Subject) => rxme.MatchReturn): rxme.MatcherCallback {

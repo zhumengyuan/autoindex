@@ -4,6 +4,7 @@ import { Response } from './rx-http';
 import { Config } from './parse-config';
 import * as simqle from 'simqle';
 import { Subject } from 'rxme';
+import { myPath } from './server';
 
 function loopGetObject(rq: simqle.Queue, rapp: rxme.Subject, s3: AWS.S3, config: Config,
   mypath: string, res: Response, ofs = 0): rxme.Observable {
@@ -17,15 +18,18 @@ function loopGetObject(rq: simqle.Queue, rapp: rxme.Subject, s3: AWS.S3, config:
     rapp.next(rxme.LogDebug(`s3.getObject:Request:`, lof));
     s3.getObject(lof, (err, data) => {
       if (err) {
-        res.statusCode = err.statusCode;
+        // console.log(`${JSON.stringify(err)}`);
+        res.statusCode = err.statusCode || 500;
+        rapp.next(rxme.LogError(`loopGetObject:ERR:`, err));
         res.setHeader('X-s3-autoindex', config.version);
+        res.write(JSON.stringify(err, null, 2));
         res.end();
         obs.complete();
         return;
       } else {
         res.statusCode = 200;
       }
-      rapp.next(rxme.LogDebug(`s3.getObject:Request:data:`, data));
+      rapp.next(rxme.LogDebug(`s3.getObject:Request:data:${mypath}:${data}`));
       if (ofs == 0) {
         // bytes 229638144-230686719/584544256
         let len = ('' + data.ContentLength);
@@ -66,21 +70,13 @@ function loopGetObject(rq: simqle.Queue, rapp: rxme.Subject, s3: AWS.S3, config:
 }
 
 export default function fileMatcher(rq: simqle.Queue,
-  rapp: rxme.Subject, s3: AWS.S3, config: any): rxme.MatcherCallback {
+  rapp: rxme.Subject, s3: AWS.S3, config: Config): rxme.MatcherCallback {
   return RxHttpMatcher((remw, sub) => {
-    let mypath = remw.req.url.replace(/\/+/g, '/');
-    // console.log(`fileMatcher:${mypath}:${remw.req.url}`);
-    if (mypath.startsWith(config.basepath)) {
-      mypath = mypath.substr(config.basepath.length);
-    }
-    if (mypath.endsWith('/')) {
-      // is a not a file
+    const mypath = myPath(config, remw.req.url);
+    if (!mypath.isFile()) {
       return;
     }
-    if (mypath.startsWith('/')) {
-      mypath = mypath.substr(1);
-    }
-    rq.push(loopGetObject(rq, rapp, s3, config, mypath, remw.res),
+    rq.push(loopGetObject(rq, rapp, s3, config, mypath.name, remw.res),
       (new rxme.Subject()).passTo());
   });
 }

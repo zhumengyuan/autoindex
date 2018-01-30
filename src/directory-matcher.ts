@@ -6,6 +6,7 @@ import * as AWS from 'aws-sdk';
 import * as simqle from 'simqle';
 import { ServerResponse } from 'http';
 import { Config } from './parse-config';
+import { myPath } from './server';
 
 function loopListObjects(rq: simqle.Queue, s3: AWS.S3, config: Config, mypath: string,
   listObjects: rxme.Subject, marker?: string): rxme.Observable {
@@ -21,6 +22,8 @@ function loopListObjects(rq: simqle.Queue, s3: AWS.S3, config: Config, mypath: s
     s3.listObjects(lo, (error, data) => {
       if (error) {
         listObjects.next(rxme.LogError('AWS:', error));
+        listObjects.complete();
+        obs.complete();
         return;
       }
       listObjects.next(new rxme.RxMe(data));
@@ -162,28 +165,19 @@ function link(fname: string): string {
 }
 
 export default function directoryMatcher(rq: simqle.Queue, rapp: rxme.Subject,
-  s3: AWS.S3, config: any): rxme.MatcherCallback {
+  s3: AWS.S3, config: Config): rxme.MatcherCallback {
   return RxHttpMatcher((remw, sub) => {
     const { req, res } = remw;
-    let mypath = req.url.replace(/\/+/g, '/');
-    // console.log(`directoryMatcher:${mypath}:${req.url}`);
-    if (mypath.startsWith(config.basepath)) {
-      mypath = mypath.substr(config.basepath.length);
-    }
-    // rapp.next(rxme.LogInfo(`[${req.path}] [${mypath}]`));
-    if (!mypath.endsWith('/')) {
+    const mypath = myPath(config, req.url);
+    if (!mypath.isDirectory()) {
       // not a directory
       return;
     }
-    if (mypath.startsWith('/')) {
-      mypath = mypath.substr(1);
-    }
     // const renderList = renderDirectoryList(mypath, res, rq, rapp, s3, config);
-
     res.statusCode = 200;
     res.setHeader('X-s3-autoindex', config.version);
-    res.write(top(config, mypath));
-    if (mypath.length > 1) {
+    res.write(top(config, mypath.name));
+    if (mypath.name.length > 1) {
       res.write(`${link('..')} ${formatDate(new Date())} ${leftPad('-', 16, ' ')}\n`);
     }
     rapp.next(rxme.LogInfo('directoryMatcher:', mypath));
@@ -211,10 +205,17 @@ export default function directoryMatcher(rq: simqle.Queue, rapp: rxme.Subject,
         const cps = sloo.CommonPrefixes || [];
         const cts = sloo.Contents || [];
         needsDoneCount += cps.length + cts.length;
-        loopDirectoryItem(mypath, cps, 0, rq, rapp, res, done, s3, config, now);
-        loopDirectoryItem(mypath, cts, 0, rq, rapp, res, done, s3, config, now);
+        loopDirectoryItem(mypath.name, cps, 0, rq, rapp, res, done, s3, config, now);
+        loopDirectoryItem(mypath.name, cts, 0, rq, rapp, res, done, s3, config, now);
       }
-    }).match(rxme.Matcher.Complete(() => true)).passTo(rapp);
-    rq.push(loopListObjects(rq, s3, config, mypath, listObjects), (new rxme.Subject()).passTo());
+    }).match(rxme.Matcher.Log(lg => {
+      if (lg.level == rxme.LogLevel.ERROR) {
+        res.write('----------------------- ERROR -----------------------\n');
+        res.write(JSON.stringify(lg, null, 2));
+        res.write('\n----------------------- ERROR -----------------------\n');
+        done.next(rxme.Msg.Number(0x10000000));
+      }
+    })).match(rxme.Matcher.Complete(() => true)).passTo(rapp);
+    rq.push(loopListObjects(rq, s3, config, mypath.name, listObjects), (new rxme.Subject()).passTo());
   });
 }
