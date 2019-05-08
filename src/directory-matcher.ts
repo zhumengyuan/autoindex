@@ -44,6 +44,17 @@ function top(config: any, prefix: string): string {
   return `<html>
   <head>
     <title>Index of s3://${config.s3.Bucket}/${prefix}</title>
+    <script type="text/javascript">
+        window.onload = function () {
+            var a_tag_list = document.getElementsByTagName("a");
+            for(var i = 0; i<a_tag_list.length; i++) {
+                url = a_tag_list[i].href.toLowerCase()
+                if (url.endsWith("index.html") || url.endsWith("index.htm")){
+                    window.location.href = a_tag_list[i].href
+                }
+            }
+        }
+    </script> 
   </head>
   <body>
     <H1>Index of s3://${config.s3.Bucket}/${prefix}</H1>
