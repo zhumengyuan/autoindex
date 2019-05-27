@@ -9,3 +9,5 @@ RUN apk add --no-cache make gcc g++ python && \
     apk del make gcc g++ python
 
 CMD ["/bin/sh", "-c", "(cd /my_app && /usr/local/bin/node dist/src/main.js)"]
+
+EXPOSE 9000
