@@ -44,6 +44,7 @@ function top(config: any, prefix: string): string {
   return `<html>
   <head>
     <title>Index of s3://${config.s3.Bucket}/${prefix}</title>
+    <meta charset="utf-8">
     <script type="text/javascript">
         window.onload = function () {
             var a_tag_list = document.getElementsByTagName("a");

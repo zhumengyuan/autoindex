@@ -50,7 +50,7 @@ export class MyPath {
 }
 
 export function myPath(config: Config, url: string): MyPath {
-  let mypath = url.replace(/\/+/g, '/');
+  let mypath = decodeURIComponent(url).replace(/\/+/g, '/');
   if (config.basepath && mypath.startsWith(config.basepath)) {
     mypath = mypath.substr(config.basepath.length);
     if (!mypath.startsWith('/')) {
